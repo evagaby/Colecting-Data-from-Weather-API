@@ -1,0 +1,43 @@
+import requests
+from mssql_python import connect
+
+conn_str = "Server=localhost;Database=api_tempo;Trusted_Connection=yes;TrustServerCertificate=yes;"
+conn = connect(conn_str)
+conn.setautocommit(True)
+cursor = conn.cursor()
+
+api_key = '1234yourapikey'
+link_api = 'http://api.weatherapi.com/v1/current.json'
+
+parametros = { 
+    'key' : api_key,
+    'q': "Salvador",
+    'lang': 'pt'}
+
+resposta = requests.get(link_api, params=parametros) 
+
+try:
+    if resposta.status_code == 200:
+        dicionario_dados = resposta.json()
+        cidade = dicionario_dados['location']['name']
+        estado = dicionario_dados['location']['region']
+        temperatura = dicionario_dados['current']['temp_c']
+        sensacao_termica = dicionario_dados['current']['feelslike_c']
+        umidade = dicionario_dados['current']['humidity']
+        cursor.execute("""
+INSERT INTO dados (cidade, estado, temperatura, sensacao_termica, umidade)
+VALUES (?, ?, ?, ?, ?)
+""", cidade, estado, temperatura, sensacao_termica, umidade)
+
+        
+except:
+    if resposta.status_code == 500:
+       status = resposta.status_code
+       texto = "Erro no servidor"
+       cursor.execute("""INSERT INTO logs_erro(code_erro, texto)
+                      VALUES (?, ?)""",status,texto)
+else:
+    status = resposta.status_code
+    texto = "ocorreu algum erro nao tratado"
+    cursor.execute("""INSERT INTO logs_erro(code_erro, texto)
+                   VALUES (?, ?)""",status,texto)
